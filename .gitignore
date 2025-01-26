@@ -171,6 +171,5 @@ cython_debug/
 .pypirc
 
 token
-storage_users_file*
 nextgis_login
 nextgis_pass
