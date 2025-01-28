@@ -3,18 +3,25 @@ import pytz
 import requests
 import re
 import json
+import os
 
-time_tz = lambda tz: datetime.utcnow().astimezone(pytz.timezone(tz))
-curr_time = lambda : time_tz('Etc/GMT-6').isoformat().split('+')[0]
+# time_tz = lambda tz: datetime.utcnow().astimezone(pytz.timezone(tz))
+# curr_time = lambda : time_tz('Etc/GMT-3').isoformat().split('+')[0]
+time_tz = lambda tz: datetime.now(pytz.timezone(tz))
+curr_time = lambda : time_tz('UTC+3').isoformat().split('+')[0]
 
 ngw_host = 'https://blacksea-monitoring.nextgis.com'
-f_lgn = open('nextgis_login', 'r')
-f_pass = open('nextgis_pass', 'r')
+# f_lgn = open('nextgis_login', 'r')
+f_lgn = os.environ['f_lgn']
+# f_pass = open('nextgis_pass', 'r')
+f_pass = os.environ['f_pass']
 
-auth = (f_lgn.read(),f_pass.read())
 
-f_lgn.close()
-f_pass.close()
+# auth = (f_lgn.read(),f_pass.read())
+auth = (f_lgn,f_pass)
+
+# f_lgn.close()
+# f_pass.close()
 
 class NextGIS:
     ngw_host = 'https://blacksea-monitoring.nextgis.com'
@@ -67,12 +74,14 @@ class NextGIS:
         try:
             # Auth 
 
-            f_lgn = open('nextgis_login', 'r')
-            f_pass = open('nextgis_pass', 'r')
-            cls.__auth = (f_lgn.read(),f_pass.read())
-            f_lgn.close()
-            f_pass.close()
+            # f_lgn = open('nextgis_login', 'r')
+            # f_pass = open('nextgis_pass', 'r')
+            # cls.__auth = (f_lgn.read(),f_pass.read())
+            # f_lgn.close()
+            # f_pass.close()
+            cls.__auth = (f_lgn,f_pass)
 
+            
             # create local base
 
             code, resp = cls._get(cls.url_feature)
