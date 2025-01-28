@@ -8,7 +8,9 @@ import os
 # time_tz = lambda tz: datetime.utcnow().astimezone(pytz.timezone(tz))
 # curr_time = lambda : time_tz('Etc/GMT-3').isoformat().split('+')[0]
 time_tz = lambda tz: datetime.now(pytz.timezone(tz))
-curr_time = lambda : time_tz('UTC+3').isoformat().split('+')[0]
+curr_time = lambda : time_tz('Etc/GMT-3').isoformat().split('+')[0]
+# time_tz = lambda tz: datetime.now(pytz.timezone(tz))
+# curr_time = lambda : time_tz('Europe/Moscow').isoformat().split('+')[0]
 
 ngw_host = 'https://blacksea-monitoring.nextgis.com'
 # f_lgn = open('nextgis_login', 'r')

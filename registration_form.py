@@ -1,4 +1,82 @@
-and item["fields"]["lat"] != 0:
+import json
+import tgm
+from telegram import InlineKeyboardMarkup, Update, constants
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, ContextTypes, filters
+
+import re
+from nextgis_connector import NextGIS
+from datetime import datetime
+import pytz
+
+GET_NOW = lambda: datetime.utcnow().astimezone(pytz.timezone('Etc/GMT-6')).strftime("%d.%m.%Y")
+GET_MAP_URL = lambda long, lat: f'https://seagull.nextgis.dev/?zoom=13&center={long}_{lat}&layers=233%2C206'
+
+text_parse_mode = constants.ParseMode.MARKDOWN_V2
+
+
+text_title_start = "Для создания заявки отправьте геопозицию, нажав на 'скрепку' ниже\n"
+text_title_continue = "Отправьте геопозицию, нажав на 'скрепку' ниже\n"
+
+text_req_not_found = 'Заявки не найдены\. Попробуйте обновить список чуть позже\n'
+text_separator = '\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\n'
+
+text_select_status = "Выберите тип заявки\n"
+text_select_car = "Выберите тип авто\n"
+text_select_cargo = "Выберите тип груза\n"
+
+kbd_sel_status = {
+    "menu_not_driver":"Ищу водителя",
+    "menu_driver":"Водитель",
+}
+kbd_sel_car = {
+    "menu_car_not_jeep":"Легковой",
+    "menu_car_jeep":"Внедорожник",
+    "menu_car_bulk":"Грузовой",
+    "menu_cancel":"Отмена"
+}
+kbd_sel_cargo = {
+    "menu_cargo_burd":"Птицы",
+    "menu_cargo_bulk":"Груз",
+    "menu_cargo_people":"Люди",
+    "menu_cancel":"Отмена"
+}
+
+# todo add "если у вас остались вопросы или предложения по работе бота, обязательно свяжитесь с нами: @sosbird_digital_team_bot"
+# todo menu: поиск/выполняется/завершен
+kbd_main_menu = {
+    "menu_request_close":"Закрыть заявку",
+    "menu_request_update":"Обновить список заявок",
+}
+
+def main_menu(username,key=None,message=None):
+    user = NextGIS.get_user(username)
+    if not user:
+        # todo add process
+        pass
+
+    text = f'Ваша заявка: {user["status"]}, '
+
+    if user["status"] == "Водитель":
+        request_status = "Ищу водителя"
+        text += f'{user["car"]}\n'
+    else:
+        request_status = "Водитель"
+        text += f'{user["cargo_type"]}\n'
+
+    # time_tz = lambda tz: datetime.now(pytz.timezone(tz))
+    # status_time = lambda : time_tz('Etc/GMT-3').strftime('%d-%m-%Y %H:%M')
+
+    text += f'Вам готовы помочь:\n'
+    text += text_separator
+
+    free_list = NextGIS.get_free_list(request_status)
+    if free_list:
+        req_text=''
+        date_now = GET_NOW().split('.')
+        for item in free_list:
+            contact_info = item["fields"]["contact_info"]
+            link = re.search("https://t.me/",contact_info)
+            if link and item["fields"]["long"] != 0 and item["fields"]["lat"] != 0:
                 map_url = GET_MAP_URL(item["fields"]["long"], item["fields"]["lat"])
                 hour = item["fields"]["dt_coord"]["hour"]
                 minute = item["fields"]["dt_coord"]["minute"]
@@ -100,28 +178,11 @@ def kbd_close_hndl(username,key=None,message=None):
             "long":0,
             "end_route":"завершено"
     })
-    text = text_select_status
-    keyboard = tgm.make_inline_keyboard(kbd_sel_status)
+    # await message.reply_text('\nВы закрыли заявку. Если Вы нашли помощника, пожалуйста, будьте с ним на связи!', parse_mode=text_parse_mode)
+    text = 'RESTART_BOT'
+    keyboard = None ##was: tgm.make_inline_keyboard(kbd_sel_status)
     return text, keyboard
 
-
-kbd_handlers_list = {
-    "menu_cancel":kbd_cancel_hndl,
-
-    "menu_not_driver":kbd_status_hndl,
-    "menu_driver":kbd_status_hndl,
-
-    "menu_car_not_jeep":kbd_car_hndl,
-    "menu_car_jeep":kbd_car_hndl,
-    "menu_car_bulk":kbd_car_hndl,
-
-    "menu_cargo_burd":kbd_cargo_hndl,
-    "menu_cargo_bulk":kbd_cargo_hndl,
-    "menu_cargo_people":kbd_cargo_hndl,
-
-    "menu_request_close":kbd_close_hndl,
-    "menu_request_update":main_menu,
-}
 
 async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = None
@@ -170,7 +231,7 @@ async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     #         print(f'[..] Sending {keyboard=}; {text=}...')
     #         await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
     #     return None
-    
+
     # In process
     # if user["end_route"] == "выполняется":
     #     print(f'\n[..] user["end_route"] == "выполняется"')
@@ -220,9 +281,13 @@ async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         text = text_select_status
         keyboard = tgm.make_inline_keyboard(kbd_sel_status)
         await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
-    
+
 async def cb_user_register(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     username = update["message"]["from"]["username"]
+    await cb_user_register_form(username, update.message)
+
+
+async def cb_user_register_form(username, source_message) -> None:
     user = NextGIS.get_user(username)
 
     text = "Здравствуйте\!\n"
@@ -236,8 +301,25 @@ async def cb_user_register(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             text += text_title_start
     else:
         text += text_title_start
-    await update.message.reply_text(text, parse_mode=text_parse_mode)
+    await source_message.reply_text(text, parse_mode=text_parse_mode)
 
+kbd_handlers_list = {
+    "menu_cancel":kbd_cancel_hndl,
+
+    "menu_not_driver":kbd_status_hndl,
+    "menu_driver":kbd_status_hndl,
+
+    "menu_car_not_jeep":kbd_car_hndl,
+    "menu_car_jeep":kbd_car_hndl,
+    "menu_car_bulk":kbd_car_hndl,
+
+    "menu_cargo_burd":kbd_cargo_hndl,
+    "menu_cargo_bulk":kbd_cargo_hndl,
+    "menu_cargo_people":kbd_cargo_hndl,
+
+    "menu_request_close":kbd_close_hndl,
+    "menu_request_update":main_menu,
+}
 
 async def cb_reaction_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
@@ -254,6 +336,11 @@ async def cb_reaction_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return None
     if query.data in kbd_handlers_list.keys():
         text, keyboard = kbd_handlers_list[query.data](username=username, key=query.data, message=query.message.text)
+        if text=='RESTART_BOT':
+            print("[/] Before await cb_user_register_form(username, update.callback_query.message)")
+            await cb_user_register_form(username, update.callback_query.message)
+            print("[/] After await cb_user_register_form(username, update.callback_query.message)")
+            return None
         if keyboard:
             await query.edit_message_text(text=text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
         else:
@@ -261,4 +348,3 @@ async def cb_reaction_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
     else:
         print(f"[!!] Got unexpected argument: {query.data}")
     return None
-
