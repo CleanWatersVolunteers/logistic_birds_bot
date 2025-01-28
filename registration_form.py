@@ -1,80 +1,4 @@
-
-import json
-import tgm
-from telegram import InlineKeyboardMarkup, Update, constants
-from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, ContextTypes, filters
-
-import re
-from nextgis_connector import NextGIS
-from datetime import datetime
-import pytz
-
-GET_NOW = lambda: datetime.utcnow().astimezone(pytz.timezone('Etc/GMT-6')).strftime("%d.%m.%Y")
-GET_MAP_URL = lambda long, lat: f'https://seagull.nextgis.dev/?zoom=13&center={long}_{lat}&layers=233%2C206'
-
-text_parse_mode = constants.ParseMode.MARKDOWN_V2
-
-
-text_title_start = "Для создания заявки отправьте геопозицию, нажав на 'скрепку' ниже\n"
-text_title_continue = "*Отправьте геопозицию, нажав на 'скрепку' ниже*\n"
-
-text_req_not_found = 'Заявки не найдены\. Попробуйте обновить список чуть позже\n'
-text_separator = '\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\n'
-
-text_select_status = "Выберите тип заявки\n"
-text_select_car = "Выберите тип авто\n"
-text_select_cargo = "Выберите тип груза\n"
-
-kbd_sel_status = {
-    "menu_not_driver":"Ищу водителя",
-    "menu_driver":"Водитель",
-}
-kbd_sel_car = {
-    "menu_car_not_jeep":"Легковой",
-    "menu_car_jeep":"Внедорожник",
-    "menu_car_bulk":"Грузовой",
-    "menu_cancel":"Отмена"
-}
-kbd_sel_cargo = {
-    "menu_cargo_burd":"Птицы",
-    "menu_cargo_bulk":"Груз",
-    "menu_cargo_people":"Люди",
-    "menu_cancel":"Отмена"
-}
-
-# todo add "если у вас остались вопросы или предложения по работе бота, обязательно свяжитесь с нами: @sosbird_digital_team_bot"
-# todo menu: поиск/выполняется/завершен
-kbd_main_menu = {
-    "menu_request_close":"Закрыть заявку",
-    "menu_request_update":"Обновить список заявок",
-}
-
-def main_menu(username,key=None,message=None):
-    user = NextGIS.get_user(username)
-    if not user:
-        # todo add process
-        pass
-
-    text = f'*Моя заявка: {user["status"]}, '
-
-    if user["status"] == "Водитель":
-        request_status = "Ищу водителя"
-        text += f'{user["car"]}*\n'
-    else:
-        request_status = "Водитель"
-        text += f'{user["cargo_type"]}*\n'
-
-    text += "Вам готовы помочь:\n"
-    text += text_separator
-
-    free_list = NextGIS.get_free_list(request_status)
-    if free_list:
-        req_text=''
-        date_now = GET_NOW().split('.')
-        for item in free_list:
-            contact_info = item["fields"]["contact_info"]
-            link = re.search("https://t.me/",contact_info)
-            if link and item["fields"]["long"] != 0 and item["fields"]["lat"] != 0:
+and item["fields"]["lat"] != 0:
                 map_url = GET_MAP_URL(item["fields"]["long"], item["fields"]["lat"])
                 hour = item["fields"]["dt_coord"]["hour"]
                 minute = item["fields"]["dt_coord"]["minute"]
@@ -86,19 +10,16 @@ def main_menu(username,key=None,message=None):
                     minute
                 )
                 date_now = datetime.now()
-                delta = (date_now - date_coord)
-                if 'days' in str(delta):
-                    loc_time = 12
-                else:
-                    loc_time = str(delta).split(':')[0]
 
-                if int(loc_time) < 12:
+                delta = (date_now - date_coord).total_seconds() / 3600
+                if int(delta) < 12:
                     req_text += f'{request_status},'
                     if request_status == "Водитель":
                         req_text += f'{item["fields"]["car"]}'
                     else:
                         req_text += f'{item["fields"]["cargo_type"]}'
-                    req_text += f'\n@{contact_info[link.span()[1]:]}'
+                    username_masked = username.replace('_', '\_')
+                    req_text += f'\n@{username_masked}' ##was: f'\n@{contact_info[link.span()[1]:]}'
                     if "dt_coord" in item["fields"]:
                         req_text += f' был в {item["fields"]["dt_coord"]["hour"]:02d}:{item["fields"]["dt_coord"]["minute"]:02d}'
                     req_text += f' [на карте]({map_url})'
@@ -156,6 +77,7 @@ def kbd_car_hndl(username,key=None,message=None):
     else:
         print("[!!] Incorrect key", key, kbd_sel_car)
         return kbd_cancel_hndl(username,key,message)
+
 def kbd_cargo_hndl(username,key=None,message=None):
     if key in kbd_sel_cargo and message:
         NextGIS.upd_user(username, {
@@ -203,8 +125,11 @@ kbd_handlers_list = {
 
 async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = None
+    is_updated_message = False
+    print(f'{update=}')
     if update.edited_message:
         message = update.edited_message
+        is_updated_message = True
     if not message and update.message:
         message = update.message
 
@@ -228,44 +153,80 @@ async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return None
 
     print("[..] Geo from user", username)
+    print(f'[..] {user=}')
 
+##{AK упрощаю код, не было отправки в гис при новой заявке после завершено
+    ##{{старый код
     # If first request
-    if not "end_route" in user:
-        NextGIS.upd_user(username, {
-            "long":message.location.longitude,
-            "lat":message.location.latitude
-        })
+    # if not user.get("end_route"):
+    #     print(f'\n[..] if not "end_route" in user')
+    #     NextGIS.upd_user(username, {
+    #         "long":message.location.longitude,
+    #         "lat":message.location.latitude
+    #     })
+    #     if not is_updated_message:
+    #         text = text_select_status
+    #         keyboard = tgm.make_inline_keyboard(kbd_sel_status)
+    #         print(f'[..] Sending {keyboard=}; {text=}...')
+    #         await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
+    #     return None
+    
+    # In process
+    # if user["end_route"] == "выполняется":
+    #     print(f'\n[..] user["end_route"] == "выполняется"')
+    #     NextGIS.upd_user(username, {
+    #         "long":message.location.longitude,
+    #         "lat":message.location.latitude
+    #     })
+    #     if not is_updated_message:
+    #         text, keyboard = main_menu(username)
+    #         print(f'\n[..] Sending {keyboard=}; {text=}...')
+    #         if keyboard:
+    #             await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
+    #         else:
+    #             await message.reply_text(text, parse_mode=text_parse_mode)
+    ##}}старый код
+
+    # в любом случае обновляем геопозицию в ГИС
+    NextGIS.upd_user(username, {
+        "long":message.location.longitude,
+        "lat":message.location.latitude
+    })
+
+    # реакция пользователю
+    if not is_updated_message: #только если получено первичное сообщение с геопозицией, а не автообновление
+        if user["end_route"] == "выполняется":
+            print(f'\n[..] user["end_route"] == "выполняется"')
+            text, keyboard = main_menu(username)
+            print(f'\n[..] Sending {keyboard=}; {text=}...')
+            if keyboard:
+                await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
+            else:
+                await message.reply_text(text, parse_mode=text_parse_mode)
+        else:
+            print(f'\n[..] не выполняется - или новый user или было завершено')
+            text = text_select_status
+            keyboard = tgm.make_inline_keyboard(kbd_sel_status)
+            print(f'[..] Sending {keyboard=}; {text=}...')
+            await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
+        return None
+
+    ##}AK упрощаю код, не было отправки в гис при новой заявке после завершено
+
+
+# ниже упрощенный вариант, чтобы не писать дублирую
+    if not is_updated_message:
+        # main menu
         text = text_select_status
         keyboard = tgm.make_inline_keyboard(kbd_sel_status)
         await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
-        return None
     
-    # In process
-    if user["end_route"] == "выполняется":
-        NextGIS.upd_user(username, {
-            "long":message.location.longitude,
-            "lat":message.location.latitude
-        })
-        text, keyboard = main_menu(username)
-        # print(text)
-        if keyboard:
-            await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
-        else:
-            await message.reply_text(text, parse_mode=text_parse_mode)
-    
-    # return None
-
-    # main menu
-    text = text_select_status
-    keyboard = tgm.make_inline_keyboard(kbd_sel_status)
-    await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
-
 async def cb_user_register(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     username = update["message"]["from"]["username"]
     user = NextGIS.get_user(username)
 
     text = "Здравствуйте\!\n"
-    text += f'_По всем вопросам и предложениям пишите нам @sosbird\_digital\_team\_bot _ \n\n'
+    text += f'_По всем вопросам и предложениям пишите нам @sosbird\_digital\_team\_bot_\n\n'
     # text += "Вопросы и предложения по работе бота обязательно пишите нам : @sosbird_digital_team_bot\n\n"
     if "end_route" in user:
         if user["end_route"] == "выполняется":
