@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 import requests
 import re
@@ -9,21 +9,21 @@ import os
 # curr_time = lambda : time_tz('Etc/GMT-3').isoformat().split('+')[0]
 time_tz = lambda tz: datetime.now(pytz.timezone(tz))
 curr_time = lambda : time_tz('Etc/GMT-3').isoformat().split('+')[0]
+
 # time_tz = lambda tz: datetime.now(pytz.timezone(tz))
 # curr_time = lambda : time_tz('Europe/Moscow').isoformat().split('+')[0]
 
 ngw_host = 'https://blacksea-monitoring.nextgis.com'
-# f_lgn = open('nextgis_login', 'r')
-f_lgn = os.environ['f_lgn']
-# f_pass = open('nextgis_pass', 'r')
-f_pass = os.environ['f_pass']
+f_lgn = open('nextgis_login', 'r')
+f_pass = open('nextgis_pass', 'r')
+auth = (f_lgn.read(),f_pass.read())
+f_lgn.close()
+f_pass.close()
 
+# f_lgn = os.environ['f_lgn']
+# f_pass = os.environ['f_pass']
+# auth = (f_lgn,f_pass)
 
-# auth = (f_lgn.read(),f_pass.read())
-auth = (f_lgn,f_pass)
-
-# f_lgn.close()
-# f_pass.close()
 
 class NextGIS:
     ngw_host = 'https://blacksea-monitoring.nextgis.com'
@@ -59,16 +59,17 @@ class NextGIS:
             print("[!!] PUT code", response.status_code, response.text)
             return response.status_code, {}
         return response.status_code, response.json()
+
     @classmethod
-    def _get_flt(cls, features)->{}:
+    def _get_flt(cls, feature_conditions)->{}:
         req = "?"
-        for key in features:
-           req += f'{key}={features[key]}&'
+        # https://blacksea-monitoring.nextgis.com/api/resource/100/feature/?fld_dt_auto__le=2025-01-15T00:00:00&dt_format=iso
+        print(f'\n{feature_conditions=}')
+        for feature_condition in feature_conditions:
+           req += f'{feature_condition}&'
         req = req[:-1]
         code, resp = cls._get(cls.url_feature+req)
-        if code == 200:
-            return resp
-        return {}
+        return resp if code == 200 else {}
 
     @classmethod
     def init(cls)->bool:
@@ -111,13 +112,23 @@ class NextGIS:
             if cls.__db[key] == id:
                 return key
         return None
+
     @classmethod
     def get_free_list(cls,who)->{}:
-        features = cls._get_flt({"fld_end_route":"выполняется", "fld_status":who})
-        if features:
-            return features
-        return {}
+        features = cls._get_flt(["fld_end_route=выполняется", f"fld_status={who}"])
+        return features if features else {}
 
+    @classmethod
+    def get_old_list(cls)->{}:
+        old_time = (datetime.fromisoformat(curr_time()) - timedelta(hours=12)).isoformat().split('+')[0]
+        old_time = datetime.fromisoformat(old_time)
+        time_condition = f"{old_time.year}-{old_time.month:02}-{old_time.day:02}T{old_time.hour:02}:{old_time.minute:02}:{old_time.second:02}"
+        time_condition = f"fld_dt_auto__le={time_condition}"
+        # https://blacksea-monitoring.nextgis.com/api/resource/100/feature/?fld_dt_auto__le=2025-01-15T00:00:00&dt_format=iso
+        
+        features = cls._get_flt([time_condition, "dt_format=iso"])
+        return features if features else {}
+    
     @classmethod
     def new_user(cls,name)->{}:
         if not name:
