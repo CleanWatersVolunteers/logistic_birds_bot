@@ -48,7 +48,7 @@ kbd_main_menu = {
     "menu_request_update":"Обновить список заявок",
 }
 
-def main_menu(username,key=None,message=None):
+def main_menu(username,key=None,message=None, debug_context=None):
     user = NextGIS.get_user(username)
     if not user:
         # todo add process
@@ -68,6 +68,21 @@ def main_menu(username,key=None,message=None):
 
     text += f'Вам готовы помочь:\n'
     text += text_separator
+
+    old_list = NextGIS.get_old_list() #ToDo
+    if old_list:
+        for item in old_list:
+            contact_info = item["fields"]["contact_info"]
+            item_username = contact_info.replace('https://t.me/','')
+            print(f'\n{item=}\n{item_username=}')
+            NextGIS.upd_user(item_username, {
+                    "car":None,
+                    "cargo_type":None,
+                    "status":None,
+                    "lat":0,
+                    "long":0,
+                    "end_route":"завершено"
+            })
 
     free_list = NextGIS.get_free_list(request_status)
     if free_list:
@@ -109,15 +124,19 @@ def main_menu(username,key=None,message=None):
     else:
         text = text_req_not_found
     text += text_separator
+    print(f'\n\nAfter get_free_list: {text=}')
     if "lat" in user and "long" in user:
         map_url = "https://seagull.nextgis.dev/"
         if user["lat"] != 0 and user["long"] != 0:
             map_url = GET_MAP_URL(user["long"], user["lat"])
         text += f'Также доступные заявки можно посмотреть на [карте]({map_url})'
         keyboard = tgm.make_inline_keyboard(kbd_main_menu)
-        return text, keyboard
-    text += text_title_continue
-    return text, None
+    else:
+        text += text_title_continue
+        keyboard = None
+    
+    print(f'\n\nBefore end of main_menu(,,{debug_context=}): {text=}; {keyboard=}')
+    return text, keyboard
 
 
 
@@ -129,7 +148,7 @@ def kbd_cancel_hndl(username,key=None,message=None):
 
 def kbd_status_hndl(username,key=None,message=None):
     if not key in kbd_sel_status:
-        print("[!!] Incorrect key", key, kbd_sel_status)
+        print("\n\n[!!] Incorrect key", key, kbd_sel_status)
         return kbd_cancel_hndl(username,key,message)
     text = f'{kbd_sel_status[key]}\n'
     if key == 'menu_not_driver':
@@ -151,10 +170,12 @@ def kbd_car_hndl(username,key=None,message=None):
             "status":message.split('\n')[0],
             "end_route":"выполняется"
         })
-        return main_menu(username)
+        res = main_menu(username, key=None,message=None, debug_context='kbd_car_hndl')
+        print(f'\n\n[..] kbd_car_hndl:: after main_menu...')
     else:
         print("[!!] Incorrect key", key, kbd_sel_car)
-        return kbd_cancel_hndl(username,key,message)
+        res = kbd_cancel_hndl(username,key,message)
+    return res
 
 def kbd_cargo_hndl(username,key=None,message=None):
     if key in kbd_sel_cargo and message:
@@ -164,10 +185,12 @@ def kbd_cargo_hndl(username,key=None,message=None):
             "status":message.split('\n')[0],
             "end_route":"выполняется"
         })
-        return main_menu(username)
+        res = main_menu(username, key=None,message=None, debug_context='kbd_cargo_hndl')
+        print(f'\n\n[..] kbd_cargo_hndl:: after main_menu...')
     else:
-        print("[!!] Incorrect key", key, kbd_sel_cargo)
-        return kbd_cancel_hndl(username,key,message)
+        print("\n[!!] Incorrect key", key, kbd_sel_cargo)
+        res =  kbd_cancel_hndl(username,key,message)
+    return res
 
 def kbd_close_hndl(username,key=None,message=None):
     NextGIS.upd_user(username, {
@@ -187,7 +210,7 @@ def kbd_close_hndl(username,key=None,message=None):
 async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = None
     is_updated_message = False
-    print(f'{update=}')
+    # print(f'\n{update=}')
     if update.edited_message:
         message = update.edited_message
         is_updated_message = True
@@ -195,7 +218,7 @@ async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         message = update.message
 
     if not message:
-        print("[!!] Unknown error")
+        print("\n\n[!!] Unknown error")
         return None
 
     username = message.from_user.username
@@ -205,16 +228,16 @@ async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         if not user:
             user = NextGIS.new_user(username)
     else:
-        print("[!!] Username not found", update)
+        print("\n\n[!!] Username not found", update)
 
     if not user:
-        print("[!!] Ошибка добавления пользователя!", username)
+        print("\n\n[!!] Ошибка добавления пользователя!", username)
         text = "Ошибка!"
         await message.reply_text(text, parse_mode=text_parse_mode)
         return None
 
-    print("[..] Geo from user", username)
-    print(f'[..] {user=}')
+    print("\n[..] Geo from user", username)
+    # print(f'[..] {user=}')
 
 ##{AK упрощаю код, не было отправки в гис при новой заявке после завершено
     ##{{старый код
@@ -258,29 +281,35 @@ async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if not is_updated_message: #только если получено первичное сообщение с геопозицией, а не автообновление
         if user["end_route"] == "выполняется":
             print(f'\n[..] user["end_route"] == "выполняется"')
-            text, keyboard = main_menu(username)
-            print(f'\n[..] Sending {keyboard=}; {text=}...')
-            if keyboard:
-                await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
+            kbd_cargo_hndl
+            text, keyboard = main_menu(username, key=None,message=None, debug_context='cb_user_location::if not is_updated_message')
+            if text == message.text:
+                print("\n\n[--] Got the same text. Skip reply")
             else:
-                await message.reply_text(text, parse_mode=text_parse_mode)
+                print(f'\n\n[..] cb_user_location:: if not is_updated_message: Sending...')
+                if keyboard:
+                    await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
+                else:
+                    await message.reply_text(text, parse_mode=text_parse_mode)
         else:
             print(f'\n[..] не выполняется - или новый user или было завершено')
             text = text_select_status
             keyboard = tgm.make_inline_keyboard(kbd_sel_status)
-            print(f'[..] Sending {keyboard=}; {text=}...')
+            print(f'\n\n[..] cb_user_location:: else: Sending...')
             await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
-        return None
+
+    print(f'\n\nBefore end of cb_user_location()')
+    return None
 
     ##}AK упрощаю код, не было отправки в гис при новой заявке после завершено
 
 
-# ниже упрощенный вариант, чтобы не писать дублирую
-    if not is_updated_message:
-        # main menu
-        text = text_select_status
-        keyboard = tgm.make_inline_keyboard(kbd_sel_status)
-        await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
+# delete this dublicate from AI: ниже упрощенный вариант, чтобы не писать дублирую
+    # if not is_updated_message:
+    #     # main menu
+    #     text = text_select_status
+    #     keyboard = tgm.make_inline_keyboard(kbd_sel_status)
+    #     await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def cb_user_register(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     username = update["message"]["from"]["username"]
@@ -321,7 +350,15 @@ kbd_handlers_list = {
     "menu_request_update":main_menu,
 }
 
+def escape_markdown(text):
+    """функция для экранирования символов перед отправкой в маркдауне Telegram"""
+    pattern = r"([_*\[\]()~|`])"
+    return re.sub(pattern, r"\\\1", text)
+
 async def cb_reaction_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    print(f'\n\n[..] cb_reaction_button...')
+    old_text = update.callback_query.message.text if update.callback_query.message else ''
+
     query = update.callback_query
     await query.answer()
 
@@ -334,17 +371,33 @@ async def cb_reaction_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
         text = "Ошибка"
         await query.edit_message_text(text=text, parse_mode=text_parse_mode)
         return None
+    
     if query.data in kbd_handlers_list.keys():
         text, keyboard = kbd_handlers_list[query.data](username=username, key=query.data, message=query.message.text)
+        print(f'\n\ncb_reaction_button:: after kbd_handlers_list...')
         if text=='RESTART_BOT':
-            print("[/] Before await cb_user_register_form(username, update.callback_query.message)")
+            print("\n\n[/] Before await cb_user_register_form(username, update.callback_query.message)")
             await cb_user_register_form(username, update.callback_query.message)
-            print("[/] After await cb_user_register_form(username, update.callback_query.message)")
+            print("\n\n[/] After await cb_user_register_form(username, update.callback_query.message)")
             return None
+        
+        text_href_pos = text.find('можно посмотреть')
+        text_to_compare = text[:text_href_pos] ##.replace('[','').replace(']','')
+        print(f'\ntext_to_compare=\n{text_to_compare}\n=')
+
+        old_text=old_text.replace('-','\-').replace('.','\.')
+        old_text_to_compare = old_text[:old_text.find('можно посмотреть')]
+        print(f'\nold_text_to_compare=\n{old_text_to_compare}\n=')
+
+        if old_text_to_compare == text_to_compare:
+            print("\n\n[--] Got the same text. Skip reply")
+            return None
+        
         if keyboard:
             await query.edit_message_text(text=text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
         else:
             await query.edit_message_text(text=text, parse_mode=text_parse_mode)
     else:
-        print(f"[!!] Got unexpected argument: {query.data}")
+        print(f"\n\n[!!] Got unexpected argument: {query.data=}")
     return None
+
