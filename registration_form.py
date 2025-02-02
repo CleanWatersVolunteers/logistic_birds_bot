@@ -97,24 +97,8 @@ def main_menu(username, key=None, message=None, debug_context=None):
 
     max_distance_limit_text = f' в пределах {MAX_DISTANCE_LIMIT} км' if MAX_DISTANCE_LIMIT>0 else ''
     text += f'*Встречные заявки{max_distance_limit_text}: *\n'
-
                                                   
     text += text_separator
-
-                                           
-                
-                             
-                                                         
-                                                                    
-                                                 
-                                             
-                               
-                                      
-                                  
-                            
-                             
-                                                    
-              
 
     free_list = NextGIS.get_free_list(request_status, user, MAX_DISTANCE_LIMIT)
     if free_list:
@@ -275,41 +259,6 @@ async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await message.reply_text(text, parse_mode=text_parse_mode)
         return None
 
-                                           
-                            
-
-                                                                                                                                  
-                           
-                      
-                                   
-                                                     
-                                      
-                                                
-                                             
-            
-                                    
-                                       
-                                                                 
-                                                            
-                                                                                                                     
-                     
-
-                
-                                                       
-                                                                        
-                                      
-                                                
-                                             
-            
-                                    
-                                                  
-                                                              
-                          
-                                                                                                                         
-                   
-                                                                            
-                           
-
     # в любом случае обновляем геопозицию в ГИС
     NextGIS.upd_user(username, {
         "long":message.location.longitude,
@@ -346,23 +295,11 @@ async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                                                                   
             await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
 
-                                                  
     return None
-
-                                                                                                                                      
-
-
-                                                                                                                            
-                                
-                     
-                                   
-                                                             
-                                                                                                                 
 
 async def cb_user_register(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     username = update["message"]["from"]["username"]
     await cb_user_register_form(username, update.message)
-
 
 async def cb_user_register_form(username, source_message) -> None:
     user = NextGIS.get_user(username)
@@ -406,16 +343,8 @@ kbd_handlers_list = {
 
     "menu_request_close":kbd_close_hndl,
     "menu_request_update":main_menu,
-}
-
-                          
-                                                                                                                                        
-                                
-                                         
 
 async def cb_reaction_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-                                            
-                                                                                          
 
     query = update.callback_query
     await query.answer()
@@ -450,17 +379,10 @@ async def cb_reaction_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     if query.data in kbd_handlers_list.keys():
         text, keyboard = kbd_handlers_list[query.data](username=username, key=query.data, message=query.message.text)
-                                                                     
-                               
-                                                                                                        
-                                                                                
-                                                                                                       
-                       
         
         ###text = escape_markdown(text)
         ##was text = text.f('\-','-').replace('-','\-').replace('\.','.').replace('.','\.')
         text_to_compare =  text[:text.find('можно посмотреть')] ##.replace('[','').replace(']','')
-                                                          
 
         old_text = update.callback_query.message.text if update.callback_query.message else ''
         ###old_text = escape_markdown(old_text)
@@ -492,4 +414,3 @@ async def cb_reaction_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
     else:
         print(f"\n\n[!!] Got unexpected argument: {query.data=}")
     return None
-
