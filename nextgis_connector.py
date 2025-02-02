@@ -4,27 +4,14 @@ import requests
 import re
 import json
 import os
+import math
 
-# time_tz = lambda tz: datetime.utcnow().astimezone(pytz.timezone(tz))
-# curr_time = lambda : time_tz('Etc/GMT-3').isoformat().split('+')[0]
 time_tz = lambda tz: datetime.now(pytz.timezone(tz))
 curr_time = lambda : time_tz('Etc/GMT-3').isoformat().split('+')[0]
 
-# time_tz = lambda tz: datetime.now(pytz.timezone(tz))
-# curr_time = lambda : time_tz('Europe/Moscow').isoformat().split('+')[0]
 
 ngw_host = 'https://blacksea-monitoring.nextgis.com'
-f_lgn = open('nextgis_login', 'r')
-f_pass = open('nextgis_pass', 'r')
-auth = (f_lgn.read(),f_pass.read())
-f_lgn.close()
-f_pass.close()
-
-# f_lgn = os.environ['f_lgn']
-# f_pass = os.environ['f_pass']
-# auth = (f_lgn,f_pass)
-
-
+                                  
 class NextGIS:
     ngw_host = 'https://blacksea-monitoring.nextgis.com'
     url_feature = ngw_host + '/api/resource/' + str(195) +'/feature/'
@@ -61,10 +48,35 @@ class NextGIS:
         return response.status_code, response.json()
 
     @classmethod
+    def _calc_dist(cls, user_lat, user_lon, search_lat, search_lon):
+    #здесь:
+    # search_lat, search_lon - искомая точка на местности
+    # user_lat, user_lon - точка текущего пользователя
+    # dist - рассчитанное расстояние
+        r = 6373.0  # radius of the Earth
+        # coordinates in radians
+        lat1 = math.radians(float(search_lat))
+        lon1 = math.radians(float(search_lon))
+        lat2 = math.radians(float(user_lat))
+        lon2 = math.radians(float(user_lon))
+        # change in coordinates
+        d_lon = lon2 - lon1
+        d_lat = lat2 - lat1
+        # Haversine formula
+        a = math.sin(d_lat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(d_lon / 2) ** 2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+        distance = r * c
+        dist = round(distance)
+
+        return dist
+    
+    
+    @classmethod
     def _get_flt(cls, feature_conditions)->{}:
         req = "?"
         # https://blacksea-monitoring.nextgis.com/api/resource/100/feature/?fld_dt_auto__le=2025-01-15T00:00:00&dt_format=iso
-        print(f'\n{feature_conditions=}')
+                                         
         for feature_condition in feature_conditions:
            req += f'{feature_condition}&'
         req = req[:-1]
@@ -76,12 +88,11 @@ class NextGIS:
         cls.__db = dict()
         try:
             # Auth 
-
-            # f_lgn = open('nextgis_login', 'r')
-            # f_pass = open('nextgis_pass', 'r')
-            # cls.__auth = (f_lgn.read(),f_pass.read())
-            # f_lgn.close()
-            # f_pass.close()
+            f_lgn = open('nextgis_login', 'r')
+            f_pass = open('nextgis_pass', 'r')
+            cls.__auth = (f_lgn.read(),f_pass.read())
+            f_lgn.close()
+            f_pass.close()
             cls.__auth = (f_lgn,f_pass)
 
             
@@ -114,8 +125,15 @@ class NextGIS:
         return None
 
     @classmethod
-    def get_free_list(cls,who)->{}:
+    def get_free_list(cls,who, user, max_distance_limit)->{}:
         features = cls._get_flt(["fld_end_route=выполняется", f"fld_status={who}"])
+        for i, feature in enumerate(features):
+            dist = cls._calc_dist(user["lat"], user["long"], feature["fields"]["lat"], feature["fields"]["long"] )
+            feature["dist"] = dist
+
+        for i, feature in enumerate(features):
+            if max_distance_limit>0 and feature["dist"] > max_distance_limit:
+                features.pop(i)
         return features if features else {}
 
     @classmethod
@@ -131,9 +149,10 @@ class NextGIS:
     
     @classmethod
     def new_user(cls,name)->{}:
+        print("[..] Add new user", name)
         if not name:
             return {}
-        print("[..] Add new user", name)
+                                        
         feature = dict()
         feature['extensions'] = dict()
         feature['extensions']['attachment'] = None
