@@ -3,18 +3,12 @@ import pytz
 import requests
 import re
 import json
+import math # todo remove after refactoring
 
 time_tz = lambda tz: datetime.utcnow().astimezone(pytz.timezone(tz))
-curr_time = lambda : time_tz('Etc/GMT-6').isoformat().split('+')[0]
+curr_time = lambda : time_tz('Etc/GMT-3').isoformat().split('+')[0]
 
 ngw_host = 'https://blacksea-monitoring.nextgis.com'
-f_lgn = open('nextgis_login', 'r')
-f_pass = open('nextgis_pass', 'r')
-
-auth = (f_lgn.read(),f_pass.read())
-
-f_lgn.close()
-f_pass.close()
 
 class NextGIS:
     ngw_host = 'https://blacksea-monitoring.nextgis.com'
@@ -50,16 +44,25 @@ class NextGIS:
             print("[!!] PUT code", response.status_code, response.text)
             return response.status_code, {}
         return response.status_code, response.json()
+    # @classmethod
+    # def _get_flt(cls, features)->{}:
+    #     req = "?"
+    #     for key in features:
+    #        req += f'{key}={features[key]}&'
+    #     req = req[:-1]
+    #     code, resp = cls._get(cls.url_feature+req)
+    #     if code == 200:
+    #         return resp
+    #     return {}
+
     @classmethod
-    def _get_flt(cls, features)->{}:
-        req = "?"
-        for key in features:
-           req += f'{key}={features[key]}&'
+    def _get_flt(cls, feature_conditions)->{}:
+        req = "?"            
+        for feature_condition in feature_conditions:
+           req += f'{feature_condition}&'
         req = req[:-1]
         code, resp = cls._get(cls.url_feature+req)
-        if code == 200:
-            return resp
-        return {}
+        return resp if code == 200 else {}
 
     @classmethod
     def init(cls)->bool:
@@ -100,18 +103,72 @@ class NextGIS:
             if cls.__db[key] == id:
                 return key
         return None
+
     @classmethod
-    def get_free_list(cls,who)->{}:
-        features = cls._get_flt({"fld_end_route":"выполняется", "fld_status":who})
-        if features:
-            return features
-        return {}
+    def get_free_list(cls,who,period_hours=12)->[]:
+        req_time = "2025-02-02T00:00:00" # todo add calculating by period_hours
+        # features = cls._get_flt((
+        #     "fld_end_route=выполняется", 
+        #     f"fld_status={who}", 
+        #     f"fld_dt_coord__le={req_time}"
+        # ))
+        features = cls._get_flt((
+            "fld_end_route=выполняется", 
+            f"fld_status={who}", 
+            # f"fld_dt_auto__le={req_time}"
+        ))
+        users = []
+        for item in features:
+            # check status
+            if item["fields"]["long"] == 0 and item["fields"]["lat"] == 0:
+                continue
+            if item["fields"]["end_route"] != "выполняется":
+                continue
+            if not "status" in item["fields"]:
+                continue
+            if not "dt_coord" in item["fields"]:
+                continue
+            if item["fields"]["status"] == "Водитель":
+                if not "car" in item["fields"]:
+                    print("[!!] Type not found", item["fields"])
+                    continue
+                item["fields"].pop("cargo_type")
+            else:
+                if not "cargo_type" in item["fields"]:
+                    print("[!!] Type not found", item["fields"])
+                    continue
+                item["fields"].pop("car")
+
+            # todo check time
+
+            users.append(item['fields'])
+
+        return users
+
+    @classmethod
+    def get_distance(cls, coord1, coord2)->int:
+        # todo need to refactoring: get distance from server API
+        r = 6373.0  # radius of the Earth
+        # coordinates in radians
+        lat1 = math.radians(float(coord1[1]))
+        lon1 = math.radians(float(coord1[0]))
+        lat2 = math.radians(float(coord2[1]))
+        lon2 = math.radians(float(coord2[0]))
+        # change in coordinates
+        d_lon = lon2 - lon1
+        d_lat = lat2 - lat1
+        # Haversine formula
+        a = math.sin(d_lat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(d_lon / 2) ** 2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        distance = r * c
+        dist = round(distance)
+        return dist
 
     @classmethod
     def new_user(cls,name)->{}:
+        print("[..] Add new user", name)
         if not name:
             return {}
-        print("[..] Add new user", name)
         feature = dict()
         feature['extensions'] = dict()
         feature['extensions']['attachment'] = None
@@ -130,11 +187,8 @@ class NextGIS:
         if not name in cls.__db:
             return {}
         id = cls.__db[name]
-        # code, res = cls._get(cls.url_feature+f"{id}?srs=4326&dt_format=iso")
         code, res = cls._get(cls.url_feature+f"{id}?srs=4326")
-        if code != 200:
-            return {}
-        return res['fields']
+        return res['fields'] if code == 200 else {}
 
     # GEO: long,lat
     # STATUS: car,cargo_type,status,end_route  
@@ -162,9 +216,7 @@ class NextGIS:
         # Request
         put_url = f"{cls.url_feature}{id}?srs=4326&dt_format=iso"
         code,_ = cls._put(put_url, feature)
-        if code == 200:
-            return True
-        return False
+        return code == 200
 
     @classmethod
     def complete_user(cls,name):

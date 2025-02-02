@@ -14,6 +14,7 @@ GET_MAP_URL = lambda long, lat: f'https://seagull.nextgis.dev/?zoom=13&center={l
 
 text_parse_mode = constants.ParseMode.MARKDOWN_V2
 
+cfg_max_distance = 0
 
 text_title_start = "Для создания заявки отправьте геопозицию, нажав на 'скрепку' ниже\n"
 text_title_continue = "*Отправьте геопозицию, нажав на 'скрепку' ниже*\n"
@@ -49,6 +50,13 @@ kbd_main_menu = {
     "menu_request_update":"Обновить список заявок",
 }
 
+def escape_markdown(text):
+    # todo need to correct this function
+    # pattern = r"([_*~|`!\.])" ##was r"(\\[_*\[\]()~|`!\.])"
+    # text = re.sub(r"\\"+pattern, r"\1", text) #размаркирование, на всякий случай, чтобы не получилось двойное
+    # text = re.sub(pattern, r"\\\1", text)
+    return text
+
 def main_menu(username,key=None,message=None):
     user = NextGIS.get_user(username)
     if not user:
@@ -69,46 +77,27 @@ def main_menu(username,key=None,message=None):
 
     free_list = NextGIS.get_free_list(request_status)
     if free_list:
-        req_text=''
-        date_now = GET_NOW().split('.')
         for item in free_list:
-            contact_info = item["fields"]["contact_info"]
+            contact_info = item["contact_info"]
             link = re.search("https://t.me/",contact_info)
-            if link and item["fields"]["long"] != 0 and item["fields"]["lat"] != 0:
-                map_url = GET_MAP_URL(item["fields"]["long"], item["fields"]["lat"])
-                hour = item["fields"]["dt_coord"]["hour"]
-                minute = item["fields"]["dt_coord"]["minute"]
-                date_coord = datetime(
-                    item["fields"]["dt_coord"]["year"], 
-                    item["fields"]["dt_coord"]["month"], 
-                    item["fields"]["dt_coord"]["day"],
-                    hour,
-                    minute
-                )
-                date_now = datetime.now()
-                delta = (date_now - date_coord)
-                if 'days' in str(delta):
-                    loc_time = 12
-                else:
-                    loc_time = str(delta).split(':')[0]
-
-                if int(loc_time) < 12:
-                    req_text += f'{request_status},'
-                    if request_status == "Водитель":
-                        req_text += f'{item["fields"]["car"]}'
-                    else:
-                        req_text += f'{item["fields"]["cargo_type"]}'
-                    req_text += f'\n@{contact_info[link.span()[1]:]}'
-                    if "dt_coord" in item["fields"]:
-                        req_text += f' был в {item["fields"]["dt_coord"]["hour"]:02d}:{item["fields"]["dt_coord"]["minute"]:02d}'
-                    req_text += f' [на карте]({map_url})'
-                    req_text += '\n\n'
-        if req_text:
-            text += req_text[:-1]
-        else:
-            text += text_req_not_found
+            contact_info = contact_info[link.span()[1]:]
+            if not link:
+                continue
+            distance = NextGIS.get_distance((user["long"], user["lat"]), (item["long"], item["lat"]))
+            if cfg_max_distance > 0 and cfg_max_distance < distance:
+                continue
+            map_url = GET_MAP_URL(item["long"], item["lat"])
+            hour = item["dt_coord"]["hour"]
+            minute = item["dt_coord"]["minute"]
+            if "car" in item:
+                text += f'Водитель, {item["car"]}, {distance}км'
+            else:
+                text += f'Ищу водителя, {item["cargo_type"]}, {distance}км'
+            text += f'\n@{contact_info} был в {hour:02d}:{minute:02d} [на карте]({map_url})\n\n'
+        text = text[:-1]
     else:
-        text = text_req_not_found
+        text += text_req_not_found
+
     text += text_separator
     if "lat" in user and "long" in user:
         map_url = "https://seagull.nextgis.dev/"
@@ -119,8 +108,6 @@ def main_menu(username,key=None,message=None):
         return text, keyboard
     text += text_title_continue
     return text, None
-
-
 
 def kbd_cancel_hndl(username,key=None,message=None):
     text = text_select_status
@@ -237,7 +224,7 @@ async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         })
         text = text_select_status
         keyboard = tgm.make_inline_keyboard(kbd_sel_status)
-        await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
+        await message.reply_text(escape_markdown(text), parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
         return None
     
     # In process
@@ -249,16 +236,16 @@ async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         text, keyboard = main_menu(username)
         # print(text)
         if keyboard:
-            await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
+            await message.reply_text(escape_markdown(text), parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
         else:
-            await message.reply_text(text, parse_mode=text_parse_mode)
+            await message.reply_text(escape_markdown(text), parse_mode=text_parse_mode)
     
     # return None
 
     # main menu
     text = text_select_status
     keyboard = tgm.make_inline_keyboard(kbd_sel_status)
-    await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
+    await message.reply_text(escape_markdown(text), parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def cb_user_register(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     username = update["message"]["from"]["username"]
@@ -275,7 +262,7 @@ async def cb_user_register(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             text += text_title_start
     else:
         text += text_title_start
-    await update.message.reply_text(text, parse_mode=text_parse_mode)
+    await update.message.reply_text(escape_markdown(text), parse_mode=text_parse_mode)
 
 
 async def cb_reaction_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -294,9 +281,9 @@ async def cb_reaction_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if query.data in kbd_handlers_list.keys():
         text, keyboard = kbd_handlers_list[query.data](username=username, key=query.data, message=query.message.text)
         if keyboard:
-            await query.edit_message_text(text=text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
+            await query.edit_message_text(text=escape_markdown(text), parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
         else:
-            await query.edit_message_text(text=text, parse_mode=text_parse_mode)
+            await query.edit_message_text(text=escape_markdown(text), parse_mode=text_parse_mode)
     else:
         print(f"[!!] Got unexpected argument: {query.data}")
     return None
