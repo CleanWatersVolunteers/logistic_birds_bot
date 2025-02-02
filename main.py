@@ -1,6 +1,6 @@
 import asyncio
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, ContextTypes, filters, JobQueue
 import registration_form
 from nextgis_connector import NextGIS
 from datetime import datetime
@@ -16,6 +16,8 @@ async def main() -> None:
 	"""Run the bot."""
 	# Create the Application and pass it your bot's token.
 	application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+
+	job_queue = application.job_queue #issues/4
 
 	application.add_handler(CommandHandler("start", registration_form.cb_user_register))
 	application.add_handler(MessageHandler(filters.TEXT, registration_form.cb_user_register))
