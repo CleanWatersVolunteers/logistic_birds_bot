@@ -1,11 +1,11 @@
-from datetime import datetime
+import datetime
 import pytz
 import requests
 import re
 import json
 import math # todo remove after refactoring
 
-time_tz = lambda tz: datetime.utcnow().astimezone(pytz.timezone(tz))
+time_tz = lambda tz: datetime.datetime.utcnow().astimezone(pytz.timezone(tz))
 curr_time = lambda : time_tz('Etc/GMT-3').isoformat().split('+')[0]
 
 ngw_host = 'https://blacksea-monitoring.nextgis.com'
@@ -106,12 +106,13 @@ class NextGIS:
 
     @classmethod
     def get_free_list(cls,who,period_hours=12)->[]:
-        req_time = "2025-02-02T00:00:00" # todo add calculating by period_hours
-        # features = cls._get_flt((
-        #     "fld_end_route=выполняется", 
-        #     f"fld_status={who}", 
-        #     f"fld_dt_coord__le={req_time}"
-        # ))
+        req_dt = datetime.datetime.now() - datetime.timedelta(hours=period_hours)
+        req_time = req_dt.isoformat()
+        features = cls._get_flt((
+            "fld_end_route=выполняется", 
+            f"fld_status={who}", 
+            f"fld_dt_coord__le={req_time}"
+        ))
         features = cls._get_flt((
             "fld_end_route=выполняется", 
             f"fld_status={who}", 
