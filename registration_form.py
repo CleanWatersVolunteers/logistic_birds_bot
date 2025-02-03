@@ -143,7 +143,6 @@ def kbd_car_hndl(username,key=None,message=None):
     else:
         print("[!!] Incorrect key", key, kbd_sel_car)
         return kbd_cancel_hndl(username,key,message)
-
 def kbd_cargo_hndl(username,key=None,message=None):
     if key in kbd_sel_cargo and message:
         NextGIS.upd_user(username, {
@@ -191,11 +190,8 @@ kbd_handlers_list = {
 
 async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = None
-    is_updated_message = False
-    print(f'{update=}')
     if update.edited_message:
         message = update.edited_message
-        is_updated_message = True
     if not message and update.message:
         message = update.message
 
@@ -219,25 +215,8 @@ async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return None
 
     print("[..] Geo from user", username)
-    print(f'[..] {user=}')
 
-##{AK упрощаю код, не было отправки в гис при новой заявке после завершено
-    ##{{старый код
     # If first request
-<<<<<<< HEAD
-    # if not user.get("end_route"):
-    #     print(f'\n[..] if not "end_route" in user')
-    #     NextGIS.upd_user(username, {
-    #         "long":message.location.longitude,
-    #         "lat":message.location.latitude
-    #     })
-    #     if not is_updated_message:
-    #         text = text_select_status
-    #         keyboard = tgm.make_inline_keyboard(kbd_sel_status)
-    #         print(f'[..] Sending {keyboard=}; {text=}...')
-    #         await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
-    #     return None
-=======
     if not "end_route" in user:
         NextGIS.upd_user(username, {
             "long":message.location.longitude,
@@ -247,42 +226,8 @@ async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         keyboard = tgm.make_inline_keyboard(kbd_sel_status)
         await message.reply_text(escape_markdown(text), parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
         return None
->>>>>>> 4c693b26c7b1288ffb91a24d8c4d2d44ebefe7f0
     
     # In process
-<<<<<<< HEAD
-    # if user["end_route"] == "выполняется":
-    #     print(f'\n[..] user["end_route"] == "выполняется"')
-    #     NextGIS.upd_user(username, {
-    #         "long":message.location.longitude,
-    #         "lat":message.location.latitude
-    #     })
-    #     if not is_updated_message:
-    #         text, keyboard = main_menu(username)
-    #         print(f'\n[..] Sending {keyboard=}; {text=}...')
-    #         if keyboard:
-    #             await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
-    #         else:
-    #             await message.reply_text(text, parse_mode=text_parse_mode)
-    ##}}старый код
-
-    # в любом случае обновляем геопозицию в ГИС
-    NextGIS.upd_user(username, {
-        "long":message.location.longitude,
-        "lat":message.location.latitude
-    })
-
-    # реакция пользователю
-    if not is_updated_message: #только если получено первичное сообщение с геопозицией, а не автообновление
-        if user["end_route"] == "выполняется":
-            print(f'\n[..] user["end_route"] == "выполняется"')
-            text, keyboard = main_menu(username)
-            print(f'\n[..] Sending {keyboard=}; {text=}...')
-            if keyboard:
-                await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
-            else:
-                await message.reply_text(text, parse_mode=text_parse_mode)
-=======
     if user["end_route"] == "выполняется":
         NextGIS.upd_user(username, {
             "long":message.location.longitude,
@@ -292,44 +237,22 @@ async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         # print(text)
         if keyboard:
             await message.reply_text(escape_markdown(text), parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
->>>>>>> 4c693b26c7b1288ffb91a24d8c4d2d44ebefe7f0
         else:
-<<<<<<< HEAD
-            print(f'\n[..] не выполняется - или новый user или было завершено')
-            text = text_select_status
-            keyboard = tgm.make_inline_keyboard(kbd_sel_status)
-            print(f'[..] Sending {keyboard=}; {text=}...')
-            await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
-        return None
-=======
             await message.reply_text(escape_markdown(text), parse_mode=text_parse_mode)
     
     # return None
->>>>>>> 4c693b26c7b1288ffb91a24d8c4d2d44ebefe7f0
 
-<<<<<<< HEAD
-    ##}AK упрощаю код, не было отправки в гис при новой заявке после завершено
-=======
     # main menu
     text = text_select_status
     keyboard = tgm.make_inline_keyboard(kbd_sel_status)
     await message.reply_text(escape_markdown(text), parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
->>>>>>> 4c693b26c7b1288ffb91a24d8c4d2d44ebefe7f0
 
-
-# ниже упрощенный вариант, чтобы не писать дублирую
-    if not is_updated_message:
-        # main menu
-        text = text_select_status
-        keyboard = tgm.make_inline_keyboard(kbd_sel_status)
-        await message.reply_text(text, parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
-    
 async def cb_user_register(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     username = update["message"]["from"]["username"]
     user = NextGIS.get_user(username)
 
     text = "Здравствуйте\!\n"
-    text += f'_По всем вопросам и предложениям пишите нам @sosbird\_digital\_team\_bot_\n\n'
+    text += f'_По всем вопросам и предложениям пишите нам @sosbird\_digital\_team\_bot _ \n\n'
     # text += "Вопросы и предложения по работе бота обязательно пишите нам : @sosbird_digital_team_bot\n\n"
     if "end_route" in user:
         if user["end_route"] == "выполняется":
@@ -364,4 +287,3 @@ async def cb_reaction_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
     else:
         print(f"[!!] Got unexpected argument: {query.data}")
     return None
-
