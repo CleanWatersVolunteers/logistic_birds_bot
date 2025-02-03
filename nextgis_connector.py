@@ -10,6 +10,17 @@ curr_time = lambda : time_tz('Etc/GMT-3').isoformat().split('+')[0]
 
 ngw_host = 'https://blacksea-monitoring.nextgis.com'
 
+class NextGISUser:
+    # location = (long, lat)
+    def __init__(self, name, type, subtype, status, hour_loc, minute_loc, location = (0,0)):
+        self.name = name
+        self.status = status
+        self.type = type
+        self.subtype = subtype
+        self.location = location
+        self.hour_loc = hour_loc
+        self.minute_loc = minute_loc
+
 class NextGIS:
     ngw_host = 'https://blacksea-monitoring.nextgis.com'
     url_feature = ngw_host + '/api/resource/' + str(195) +'/feature/'
@@ -44,16 +55,6 @@ class NextGIS:
             print("[!!] PUT code", response.status_code, response.text)
             return response.status_code, {}
         return response.status_code, response.json()
-    # @classmethod
-    # def _get_flt(cls, features)->{}:
-    #     req = "?"
-    #     for key in features:
-    #        req += f'{key}={features[key]}&'
-    #     req = req[:-1]
-    #     code, resp = cls._get(cls.url_feature+req)
-    #     if code == 200:
-    #         return resp
-    #     return {}
 
     @classmethod
     def _get_flt(cls, feature_conditions)->{}:
@@ -93,12 +94,12 @@ class NextGIS:
         return True
 
     @classmethod
-    def get_id(cls,name)->int:
+    def __get_id(cls,name)->int:
         if name in cls.__db:
             return cls.__db[name]
         return 0
     @classmethod
-    def get_name(cls,id)->str:
+    def __get_name(cls,id)->str:
         for key in cls.__db:
             if cls.__db[key] == id:
                 return key
@@ -107,42 +108,47 @@ class NextGIS:
     @classmethod
     def get_free_list(cls,who,period_hours=12)->[]:
         req_time = "2025-02-02T00:00:00" # todo add calculating by period_hours
-        # features = cls._get_flt((
-        #     "fld_end_route=выполняется", 
-        #     f"fld_status={who}", 
-        #     f"fld_dt_coord__le={req_time}"
-        # ))
         features = cls._get_flt((
             "fld_end_route=выполняется", 
             f"fld_status={who}", 
-            # f"fld_dt_auto__le={req_time}"
         ))
         users = []
         for item in features:
             # check status
-            if item["fields"]["long"] == 0 and item["fields"]["lat"] == 0:
-                continue
-            if item["fields"]["end_route"] != "выполняется":
-                continue
-            if not "status" in item["fields"]:
-                continue
-            if not "dt_coord" in item["fields"]:
-                continue
-            if item["fields"]["status"] == "Водитель":
-                if not "car" in item["fields"]:
-                    print("[!!] Type not found", item["fields"])
+            try:
+                if item["fields"]["long"] == 0 and item["fields"]["lat"] == 0:
                     continue
-                item["fields"].pop("cargo_type")
-            else:
-                if not "cargo_type" in item["fields"]:
-                    print("[!!] Type not found", item["fields"])
+                if item["fields"]["end_route"] != "выполняется":
                     continue
+                if not "status" in item["fields"]:
+                    continue
+                if not "dt_coord" in item["fields"]:
+                    continue
+                if item["fields"]["status"] == "Водитель":
+                    item["fields"]["type"] = item["fields"]["car"]
+                else:
+                    item["fields"]["type"] = item["fields"]["cargo_type"]
+                item["fields"].pop("cargo_type")    
                 item["fields"].pop("car")
+                contact_info = item["contact_info"]
+                link = re.search("https://t.me/",contact_info)
+                if not link:
+                    continue
+                item["fields"]["username"] = contact_info[link.span()[1]:]
+            except:
+                continue
 
             # todo check time
 
-            users.append(item['fields'])
-
+            users.append(NextGISUser(
+                name = item["fields"]["username"],
+                hour_loc = item["fields"]["dt_coord"]["hour"],
+                minute_loc = item["fields"]["dt_coord"]["minute"],
+                status = item["fields"]["end_route"],  
+                type = item["fields"]["status"],
+                subtype = item["fields"]["type"],
+                location = (item["fields"]["long"],item["fields"]["lat"])
+            ))
         return users
 
     @classmethod
@@ -180,23 +186,42 @@ class NextGIS:
             if 'id' in data:
                 cls.__db[name] = data['id']
                 return cls.get_user(name)
-        return {}
+        return None
 
     @classmethod
-    def get_user(cls,name)->{}:
+    def get_user(cls,name)->NextGISUser:
         if not name in cls.__db:
             return {}
         id = cls.__db[name]
         code, res = cls._get(cls.url_feature+f"{id}?srs=4326")
-        return res['fields'] if code == 200 else {}
+        if code != 200:
+            return None
+
+        if res["fields"]["status"] == "Водитель":
+            res["fields"]["type"] = res["fields"]["car"]
+        else:
+            res["fields"]["type"] = res["fields"]["cargo_type"]
+        contact_info = res["fields"]["contact_info"]
+        link = re.search("https://t.me/",contact_info)
+        if not link:
+            return None
+        return NextGISUser(
+            name = contact_info[link.span()[1]:],
+            status = res["fields"]["end_route"], 
+            hour_loc = res["fields"]["dt_coord"]["hour"],
+            minute_loc = res["fields"]["dt_coord"]["minute"],
+            type = res["fields"]["status"],
+            subtype = res["fields"]["type"], 
+            location = (res["fields"]["long"],res["fields"]["lat"])
+        )
 
     # GEO: long,lat
     # STATUS: car,cargo_type,status,end_route  
     @classmethod
     def upd_user(cls,name, details)->bool:
-        id = cls.get_id(name)
+        id = cls.__get_id(name)
         if id == 0:
-            return False
+            return None
 
         # main data
         feature = dict()
@@ -216,9 +241,13 @@ class NextGIS:
         # Request
         put_url = f"{cls.url_feature}{id}?srs=4326&dt_format=iso"
         code,_ = cls._put(put_url, feature)
-        return code == 200
+
+        return cls.get_user(name) if code == 200 else None
 
     @classmethod
     def complete_user(cls,name):
-        cls.upd_user(name, {"long":0, "lat":0,"end_route":"завершено"})
+        cls.upd_user(name, {
+            "long":0, "lat":0,"end_route":"завершено",
+            "car":None,"cargo_type":None,"status":None,
+        })
 
