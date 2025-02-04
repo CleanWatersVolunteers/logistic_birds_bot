@@ -5,7 +5,8 @@ import re
 import json
 import math # todo remove after refactoring
 
-time_tz = lambda tz: datetime.utcnow().astimezone(pytz.timezone(tz))
+# time_tz = lambda tz: datetime.utcnow().astimezone(pytz.timezone(tz))
+time_tz = lambda tz: datetime.now().astimezone(pytz.timezone(tz))
 curr_time = lambda : time_tz('Etc/GMT-3').isoformat().split('+')[0]
 
 ngw_host = 'https://blacksea-monitoring.nextgis.com'
