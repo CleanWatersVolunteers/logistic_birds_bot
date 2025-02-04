@@ -67,6 +67,13 @@ def text_escape(text):
     # text = re.sub(pattern, r"\\\1", text)
     return text
 
+def username_as_markdown(text):
+    # todo need to correct this function
+    pattern = r"([_*~|`!\.])" ##was r"(\\[_*\[\]()~|`!\.])"
+    text = re.sub(r"\\"+pattern, r"\1", text) #размаркирование, на всякий случай, чтобы не получилось двойное
+    text = re.sub(pattern, r"\\\1", text)
+    return text
+
 def user_in_process(user)->bool:
     if not user:
         return False
@@ -91,8 +98,6 @@ def user_get_create(username):
 
 
 def ui_select_menu(user,key=None,message=None):
-    # print("SELECT", key, message)
-
     if key in kbd_sel_status: # type selected
         text = f'{kbd_sel_status[key]}\n'
         if key == "menu_not_driver":
@@ -123,9 +128,15 @@ def ui_select_menu(user,key=None,message=None):
 
 def ui_main_menu(user,key=None,message=None):
     text = f'*Моя заявка: {user.type}, {user.subtype}*\n'
-    free_list = NextGIS.get_free_list(user.type)
+    if user.type == "Водитель":
+        free_list = NextGIS.get_free_list("Ищу водителя")
+    else:
+        free_list = NextGIS.get_free_list("Водитель")
     if free_list:
-        text += "Вам готовы помочь:\n"
+        if user.type == "Водитель":
+            text += "Ждут помощи:\n"
+        else:
+            text += "Вам готовы помочь:\n"
         text += text_separator
         for item in free_list:
             distance = NextGIS.get_distance(item.location,user.location)
@@ -134,15 +145,13 @@ def ui_main_menu(user,key=None,message=None):
             map_url = GET_MAP_URL(item.location)
             hour = item.hour_loc
             minute = item.minute_loc
-            text += f'{user.type}, {user.subtype}, {distance}км'
-            text += f'\n@{item.user} был в {hour:02d}:{minute:02d} [на карте]({map_url})\n\n'
+            text += f'{item.subtype}, {distance}км'
+            text += f'\n@{username_as_markdown(item.name)} был в {hour:02d}:{minute:02d} [на карте]({map_url})\n\n'
         text = text[:-1]
         text += text_separator
     else:
-        # text += text_separator
         text += text_req_not_found
 
-    # text += text_separator
     text += f'Также доступные заявки можно посмотреть на [карте]({GET_MAP_URL(user.location)})\n'
     text += text_help
     keyboard = tgm.make_inline_keyboard(kbd_main_menu)
@@ -215,10 +224,13 @@ async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     # show menu
     if not user_in_process(user) and update.message: # first request 
         text, keyboard = ui_select_menu(user)
-        if keyboard:
-            await message.reply_text(text_escape(text), parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
-        else:
-            await message.reply_text(text_escape(text), parse_mode=text_parse_mode)
+        try:
+            if keyboard:
+                await message.reply_text(text_escape(text), parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
+            else:
+                await message.reply_text(text_escape(text), parse_mode=text_parse_mode)
+        except Exception as e:
+            print('[!!] Exception ', e)
     return None
 
 async def cb_user_register(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -236,10 +248,13 @@ async def cb_user_register(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         text, keyboard = ui_main_menu(user)
     else:
         text, keyboard = ui_welcome(user)
-    if keyboard:
-        await update.message.reply_text(text_escape(text), parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
-    else:
-        await update.message.reply_text(text_escape(text), parse_mode=text_parse_mode)
+    try:
+        if keyboard:
+            await update.message.reply_text(text_escape(text), parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
+        else:
+            await update.message.reply_text(text_escape(text), parse_mode=text_parse_mode)
+    except Exception as e:
+        print('[!!] Exception ', e)
 
 async def cb_reaction_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
@@ -262,9 +277,12 @@ async def cb_reaction_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
         text = "Ошибка\!"
         keyboard = None
 
-    if keyboard:
-        await query.edit_message_text(text=text_escape(text), parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
-    else:
-        await query.edit_message_text(text=text_escape(text), parse_mode=text_parse_mode)
+    try:
+        if keyboard:
+            await query.edit_message_text(text=text_escape(text), parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
+        else:
+            await query.edit_message_text(text=text_escape(text), parse_mode=text_parse_mode)
+    except Exception as e:
+        print('[!!] Exception ', e)
     return None
 

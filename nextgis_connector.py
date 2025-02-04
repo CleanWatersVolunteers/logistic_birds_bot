@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 import requests
 import re
@@ -107,11 +107,13 @@ class NextGIS:
 
     @classmethod
     def get_free_list(cls,who,period_hours=12)->[]:
-        req_time = "2025-02-02T00:00:00" # todo add calculating by period_hours
+        req_time = datetime.now() - timedelta(hours=period_hours)
         features = cls._get_flt((
             "fld_end_route=выполняется", 
             f"fld_status={who}", 
+            f"fld_dt_coord__ge={req_time}"
         ))
+
         users = []
         for item in features:
             # check status
@@ -130,12 +132,13 @@ class NextGIS:
                     item["fields"]["type"] = item["fields"]["cargo_type"]
                 item["fields"].pop("cargo_type")    
                 item["fields"].pop("car")
-                contact_info = item["contact_info"]
+                contact_info = item["fields"]["contact_info"]
                 link = re.search("https://t.me/",contact_info)
                 if not link:
                     continue
                 item["fields"]["username"] = contact_info[link.span()[1]:]
-            except:
+            except Exception as e:
+                print('[!!] Exception ', e)
                 continue
 
             # todo check time
