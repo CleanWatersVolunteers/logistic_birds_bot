@@ -68,9 +68,8 @@ def text_escape(text):
     return text
 
 def username_as_markdown(text):
-    # todo need to correct this function
-    pattern = r"([_*~|`!\.])" ##was r"(\\[_*\[\]()~|`!\.])"
-    text = re.sub(r"\\"+pattern, r"\1", text) #размаркирование, на всякий случай, чтобы не получилось двойное
+    pattern = r"([_*~|`!\.])"
+    text = re.sub(r"\\"+pattern, r"\1", text)
     text = re.sub(pattern, r"\\\1", text)
     return text
 
@@ -152,7 +151,7 @@ def ui_main_menu(user,key=None,message=None):
     else:
         text += text_req_not_found
 
-    text += f'Также доступные заявки можно посмотреть на [карте]({GET_MAP_URL(user.location)})\n'
+    text += f'Также доступные заявки можно посмотреть на [карте]({GET_MAP_URL(user.location)})\n\n'
     text += text_help
     keyboard = tgm.make_inline_keyboard(kbd_main_menu)
     return text, keyboard
