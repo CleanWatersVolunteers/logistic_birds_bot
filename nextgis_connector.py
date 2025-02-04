@@ -66,6 +66,23 @@ class NextGIS:
         return resp if code == 200 else {}
 
     @classmethod
+    def user_clear_old(cls)->None:
+        try:
+            req_time = datetime.now() - timedelta(hours=12)
+            features = cls._get_flt((
+                "fld_end_route=выполняется",
+                f"fld_dt_coord__le={req_time}"
+            ))
+            for item in features:
+                contact_info = item["fields"]["contact_info"]
+                link = re.search("https://t.me/",contact_info)
+                if not link:
+                    continue
+                cls.complete_user(contact_info[link.span()[1]:])
+        except Exception as e:
+            print("[!!] Clear error", e)
+
+    @classmethod
     def init(cls)->bool:
         cls.__db = dict()
         try:
