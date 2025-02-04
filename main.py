@@ -33,7 +33,8 @@ async def main() -> None:
 	print("[OK] Bot enabled")
 
 	while True:
-		await asyncio.sleep(5*60)
+		await asyncio.sleep(6*3600)
+		NextGIS.user_clear_old()
 
 	await application.updater.stop()
 	print("[OK] Bot disabled")
