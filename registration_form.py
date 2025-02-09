@@ -239,7 +239,7 @@ async def cb_user_register(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if not user:
         print("[!!] Ошибка пользователя!", username)
         text = "Ошибка\!"
-        await message.reply_text(text, parse_mode=text_parse_mode)
+        await update.message.reply_text(text, parse_mode=text_parse_mode)
         return None
 
     # show menu
