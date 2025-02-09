@@ -144,14 +144,16 @@ def ui_main_menu(user,key=None,message=None):
             map_url = GET_MAP_URL(item.location)
             hour = item.hour_loc
             minute = item.minute_loc
-            text += f'{item.subtype}, {distance}км'
-            text += f'\n@{username_as_markdown(item.name)} был в {hour:02d}:{minute:02d} [на карте]({map_url})\n\n'
+            text += f'{item.subtype} {distance}км, был в {hour:02d}:{minute:02d}\n'
+            text += f'[написать](https://t.me/{username_as_markdown(item.name)}), [на карте]({map_url})\n\n'
+            # text += f'\n@{username_as_markdown(item.name)} был в {hour:02d}:{minute:02d} [на карте]({map_url})\n\n'
+
         text = text[:-1]
         text += text_separator
     else:
         text += text_req_not_found
 
-    text += f'Также доступные заявки можно посмотреть на [карте]({GET_MAP_URL(user.location)})\n\n'
+    text += f'Все доступные заявки можно посмотреть на [карте]({GET_MAP_URL(user.location)})\n\n'
     text += text_help
     keyboard = tgm.make_inline_keyboard(kbd_main_menu)
     return text, keyboard
@@ -225,9 +227,9 @@ async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         text, keyboard = ui_select_menu(user)
         try:
             if keyboard:
-                await message.reply_text(text_escape(text), parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
+                await message.reply_text(text_escape(text), parse_mode=text_parse_mode, disable_web_page_preview=True, reply_markup=InlineKeyboardMarkup(keyboard))
             else:
-                await message.reply_text(text_escape(text), parse_mode=text_parse_mode)
+                await message.reply_text(text_escape(text), parse_mode=text_parse_mode, disable_web_page_preview=True)
         except Exception as e:
             print('[!!] Exception ', e)
     return None
@@ -249,9 +251,9 @@ async def cb_user_register(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         text, keyboard = ui_welcome(user)
     try:
         if keyboard:
-            await update.message.reply_text(text_escape(text), parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
+            await update.message.reply_text(text_escape(text), parse_mode=text_parse_mode, disable_web_page_preview=True, reply_markup=InlineKeyboardMarkup(keyboard))
         else:
-            await update.message.reply_text(text_escape(text), parse_mode=text_parse_mode)
+            await update.message.reply_text(text_escape(text), parse_mode=text_parse_mode, disable_web_page_preview=True)
     except Exception as e:
         print('[!!] Exception ', e)
 
@@ -278,9 +280,9 @@ async def cb_reaction_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     try:
         if keyboard:
-            await query.edit_message_text(text=text_escape(text), parse_mode=text_parse_mode, reply_markup=InlineKeyboardMarkup(keyboard))
+            await query.edit_message_text(text=text_escape(text), parse_mode=text_parse_mode, disable_web_page_preview=True, reply_markup=InlineKeyboardMarkup(keyboard))
         else:
-            await query.edit_message_text(text=text_escape(text), parse_mode=text_parse_mode)
+            await query.edit_message_text(text=text_escape(text), parse_mode=text_parse_mode, disable_web_page_preview=True)
     except Exception as e:
         print('[!!] Exception ', e)
     return None
