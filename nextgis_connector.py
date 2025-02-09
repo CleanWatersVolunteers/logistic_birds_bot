@@ -225,6 +225,17 @@ class NextGIS:
         link = re.search("https://t.me/",contact_info)
         if not link:
             return None
+
+        if res["fields"]["dt_coord"] == None:
+            res["fields"]["dt_coord"] = {}
+            res["fields"]["dt_coord"]["hour"] = 0
+            res["fields"]["dt_coord"]["minute"] = 0
+
+        if res["fields"]['long'] == None:
+            res["fields"]["long"] = 0
+        if res["fields"]['lat'] == None:
+            res["fields"]["lat"] = 0
+
         return NextGISUser(
             name = contact_info[link.span()[1]:],
             status = res["fields"]["end_route"], 
