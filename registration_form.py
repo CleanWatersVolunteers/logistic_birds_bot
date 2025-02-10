@@ -56,6 +56,10 @@ kbd_main_menu = {
     "menu_request_update":"Обновить список заявок",
 }
 
+kbd_yes_no = {
+    "menu_yes":"Да",
+    "menu_no":"Нет",
+}
 ################################
 # Support functions
 ################################
@@ -125,12 +129,34 @@ def ui_select_menu(user,key=None,message=None):
         keyboard = tgm.make_inline_keyboard(kbd_sel_status)
     return text, keyboard
 
+def ui_yes_hndl(user,key=None,message=None):
+    if user_in_process(user):
+        return ui_main_menu(user)
+    else:
+        return ui_welcome(user) 
+
+def ui_no_hndl(user,key=None,message=None):
+    # todo add process
+    if user_in_process(user):
+        text, kbd = ui_main_menu(user)
+        # print(text)
+    else:
+        text, kbd = ui_welcome(user) 
+    return text, kbd
+
+def ui_replace_comment(user,key=None,message=None):
+    text = f"Вы ввели новое описание заявки:_\n{username_as_markdown(message)}\n_ Сохранить?"
+    kbd = tgm.make_inline_keyboard(kbd_yes_no)
+    return text, kbd
+
 def ui_main_menu(user,key=None,message=None):
-    text = f'*Моя заявка: {user.type}, {user.subtype}*\n'
+    text = f'*Моя заявка: {user.type}, {user.subtype}, [на карте]({GET_MAP_URL(user.location)})*\n'
     if user.type == "Водитель":
         free_list = NextGIS.get_free_list("Ищу водителя")
     else:
         free_list = NextGIS.get_free_list("Водитель")
+    # if user.comment != None:
+    #     text +=f'_*{username_as_markdown(user.comment)}*_\n'
     if free_list:
         if user.type == "Водитель":
             text += "Ждут помощи:\n"
@@ -145,15 +171,18 @@ def ui_main_menu(user,key=None,message=None):
             hour = item.hour_loc
             minute = item.minute_loc
             text += f'{item.subtype} {distance}км, был в {hour:02d}:{minute:02d}\n'
+            # if item.comment != None:
+            #     print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!', item.comment, username_as_markdown(item.comment))
+                # text += f'_{username_as_markdown(item.comment)}_\n'
             text += f'[написать](https://t.me/{username_as_markdown(item.name)}), [на карте]({map_url})\n\n'
-            # text += f'\n@{username_as_markdown(item.name)} был в {hour:02d}:{minute:02d} [на карте]({map_url})\n\n'
 
         text = text[:-1]
         text += text_separator
     else:
         text += text_req_not_found
 
-    text += f'Все доступные заявки можно посмотреть на [карте]({GET_MAP_URL(user.location)})\n\n'
+    # text += f'Все доступные заявки можно посмотреть на [карте]({GET_MAP_URL(user.location)})\n\n'
+    text += '⚠ *Пожалуйста, подробности о маршруте уточняйте у пользователя из заявки*\n'
     text += text_help
     keyboard = tgm.make_inline_keyboard(kbd_main_menu)
     return text, keyboard
@@ -191,6 +220,9 @@ kbd_handlers_list = {
 
     "menu_request_close":kbd_close_hndl,
     "menu_request_update":ui_main_menu,
+
+    "menu_yes":ui_yes_hndl,
+    "menu_no":ui_no_hndl,
 }
 
 async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -246,6 +278,7 @@ async def cb_user_register(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     # show menu
     if user_in_process(user):
+        # text, keyboard = ui_replace_comment(user, message=update.message.text)
         text, keyboard = ui_main_menu(user)
     else:
         text, keyboard = ui_welcome(user)

@@ -12,7 +12,7 @@ ngw_host = 'https://blacksea-monitoring.nextgis.com'
 
 class NextGISUser:
     # location = (long, lat)
-    def __init__(self, name, type, subtype, status, hour_loc, minute_loc, location = (0,0)):
+    def __init__(self, name, type, subtype, status, hour_loc, minute_loc, location = (0,0), comment = None):
         self.name = name
         self.status = status
         self.type = type
@@ -20,6 +20,7 @@ class NextGISUser:
         self.location = location
         self.hour_loc = hour_loc
         self.minute_loc = minute_loc
+        self.comment = comment
 
 class NextGIS:
     ngw_host = 'https://blacksea-monitoring.nextgis.com'
@@ -158,8 +159,6 @@ class NextGIS:
                 print('[!!] Exception ', e)
                 continue
 
-            # todo check time
-
             users.append(NextGISUser(
                 name = item["fields"]["username"],
                 hour_loc = item["fields"]["dt_coord"]["hour"],
@@ -167,7 +166,8 @@ class NextGIS:
                 status = item["fields"]["end_route"],  
                 type = item["fields"]["status"],
                 subtype = item["fields"]["type"],
-                location = (item["fields"]["long"],item["fields"]["lat"])
+                location = (item["fields"]["long"],item["fields"]["lat"]),
+                comment = item["fields"]["comment"]
             ))
         return users
 
@@ -243,7 +243,8 @@ class NextGIS:
             minute_loc = res["fields"]["dt_coord"]["minute"],
             type = res["fields"]["status"],
             subtype = res["fields"]["type"], 
-            location = (res["fields"]["long"],res["fields"]["lat"])
+            location = (res["fields"]["long"],res["fields"]["lat"]),
+            comment = res["fields"]["comment"]
         )
 
     # GEO: long,lat

@@ -22,9 +22,6 @@ async def main() -> None:
 	application.add_handler(CallbackQueryHandler(registration_form.cb_reaction_button))
 	application.add_handler(MessageHandler(filters.LOCATION, registration_form.cb_user_location))
 
-	# application.add_handler(CommandHandler("stop", cb_user_info_revoke))
-	
-	
 
 	await application.initialize()
 	await application.start()
