@@ -12,7 +12,7 @@ ngw_host = 'https://blacksea-monitoring.nextgis.com'
 
 class NextGISUser:
     # location = (long, lat)
-    def __init__(self, name, type, subtype, status, hour_loc, minute_loc, location = (0,0), comment = None):
+    def __init__(self, name, type, subtype, status, hour_loc, minute_loc, location = (0,0), comment=None):
         self.name = name
         self.status = status
         self.type = type
@@ -159,6 +159,8 @@ class NextGIS:
                 print('[!!] Exception ', e)
                 continue
 
+            # todo check time
+
             users.append(NextGISUser(
                 name = item["fields"]["username"],
                 hour_loc = item["fields"]["dt_coord"]["hour"],
@@ -260,7 +262,7 @@ class NextGIS:
         feature['fields'] = dict()
         for key in details:
             feature['fields'][key] = details[key]
-        
+
         # time 
         time = curr_time()
         feature['fields']['dt_auto'] = time
@@ -280,6 +282,16 @@ class NextGIS:
     def complete_user(cls,name):
         cls.upd_user(name, {
             "long":0, "lat":0,"end_route":"завершено",
-            "car":None,"cargo_type":None,"status":None,
+            "car":None,"cargo_type":None,"status":None,"comment":'0'
         })
 
+    @classmethod
+    def set_cached_comments(cls,comments):
+        cls.__db["comments"] = comments
+    
+    @classmethod
+    def get_cached_comments(cls):
+        if "comments" in cls.__db:
+            return cls.__db["comments"]
+        else:
+            return {}
