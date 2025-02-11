@@ -15,21 +15,25 @@ GET_MAP_URL = lambda location: f'https://seagull.nextgis.dev/?zoom=13&center={lo
 text_parse_mode = constants.ParseMode.MARKDOWN_V2
 
 cfg_max_distance = 0
-cfg_max_symbols = 100
+cfg_max_symbols = 150
 
-text_title_start = "Для создания заявки отправьте геопозицию, нажав на 'скрепку' ниже\n"
-text_title_continue = "*Отправьте геопозицию, нажав на 'скрепку' ниже*\n"
+text_help = f'\n_По всем вопросам и предложениям пишите [нам](https://t.me/sosbird\_digital\_team\_bot) _ \n'
+
+text_welcome = "Здравствуйте\!\n⚠ Для создания заявки отправьте геопозицию, нажав на 'скрепку' ниже\n"
+text_welcome += text_help
+text_wait_location = "⚠ Для создания заявки отправьте геопозицию, нажав на 'скрепку' ниже\n"
+text_wait_location += text_help
 
 text_req_not_found = '❌ Заявки не найдены\. Попробуйте обновить список чуть позже\n'
 text_separator = '\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\n'
 
-text_help = f'\n_По всем вопросам и предложениям пишите нам @sosbird\_digital\_team\_bot _ \n'
+text_short_desc = f'''⚠ *Редактирование заявки:
+\- Комментарий: текст \(до {cfg_max_symbols} симв\.\)  
+\- Геопозиция: отправьте через 'скрепку'
+_Детали уточняйте у автора заявки_*
+'''
+# text_short_desc = f'⚠ *Вы можете добавить описание заявки в текстовом поле ниже \(максимум {cfg_max_symbols} символов\), также уточняйте детали в личных сообщениях*\n'
 
-text_welcome = "Здравствуйте\!\n⚠ Для создания заявки отправьте геопозицию, нажав на 'скрепку' ниже\n"
-text_welcome += text_help
-
-text_wait_location = "⚠ Для создания заявки отправьте геопозицию, нажав на 'скрепку' ниже\n"
-text_wait_location += text_help
 
 text_select_status = "Выберите тип заявки\n"
 text_select_car = "Выберите тип авто\n"
@@ -129,6 +133,8 @@ def ui_yes_hndl(user,key=None,message=None):
         user.comment = ''
         for item in comments:
             user.comment += f'{item}\n'
+        if len(user.comment) > 1:
+            user.comment = user.comment[:-1]
         NextGIS.upd_user(user.name, {"comment":user.comment})
         return ui_main_menu(user)
     else:
@@ -153,7 +159,7 @@ def ui_main_menu(user,key=None,message=None):
     else:
         free_list = NextGIS.get_free_list("Водитель")
     if user.comment != None:
-        text +=f'_*{text_to_markdown(user.comment)}*_\n'
+        text +=f'_*{text_to_markdown(user.comment)}*_\n\n'
     if free_list:
         if user.type == "Водитель":
             text += "Ждут помощи:\n"
@@ -177,9 +183,7 @@ def ui_main_menu(user,key=None,message=None):
     else:
         text += text_req_not_found
 
-    # text += f'Все доступные заявки можно посмотреть на [карте]({GET_MAP_URL(user.location)})\n\n'
-    text += f'⚠ *Вы можете добавить описание заявки в текстовом поле ниже \(максимум {cfg_max_symbols} символов\), также уточняйте детали в личных сообщениях*\n'
-    # text += '⚠ *Пожалуйста, подробности о маршруте уточняйте у пользователя из заявки*\n'
+    text += text_short_desc
     text += text_help
     keyboard = tgm.make_inline_keyboard(kbd_main_menu)
     return text, keyboard
