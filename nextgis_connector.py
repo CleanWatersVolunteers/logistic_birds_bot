@@ -68,9 +68,9 @@ class NextGIS:
         return resp if code == 200 else {}
 
     @classmethod
-    def user_clear_old(cls)->None:
+    def user_clear_old(cls,period_hours=24*2)->None:
         try:
-            req_time = datetime.now() - timedelta(hours=12)
+            req_time = datetime.now() - timedelta(hours=period_hours)
             features = cls._get_flt((
                 "fld_end_route=выполняется",
                 f"fld_dt_coord__le={req_time}"
@@ -125,7 +125,7 @@ class NextGIS:
         return None
 
     @classmethod
-    def get_free_list(cls,who,period_hours=12)->[]:
+    def get_free_list(cls,who,period_hours=24*2)->[]:
         req_time = datetime.now() - timedelta(hours=period_hours)
         features = cls._get_flt((
             "fld_end_route=выполняется", 
