@@ -15,20 +15,25 @@ GET_MAP_URL = lambda location: f'https://seagull.nextgis.dev/?zoom=13&center={lo
 text_parse_mode = constants.ParseMode.MARKDOWN_V2
 
 cfg_max_distance = 0
+cfg_max_symbols = 150
 
-text_title_start = "Для создания заявки отправьте геопозицию, нажав на 'скрепку' ниже\n"
-text_title_continue = "*Отправьте геопозицию, нажав на 'скрепку' ниже*\n"
+text_help = f'\n_По всем вопросам и предложениям пишите [нам](https://t.me/sosbird\_digital\_team\_bot) _ \n'
+
+text_welcome = "Здравствуйте\!\n⚠ Для создания заявки отправьте геопозицию, нажав на 'скрепку' ниже\n"
+text_welcome += text_help
+text_wait_location = "⚠ Для создания заявки отправьте геопозицию, нажав на 'скрепку' ниже\n"
+text_wait_location += text_help
 
 text_req_not_found = '❌ Заявки не найдены\. Попробуйте обновить список чуть позже\n'
 text_separator = '\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\n'
 
-text_help = f'_По всем вопросам и предложениям пишите нам @sosbird\_digital\_team\_bot _ \n\n'
-text_welcome = "Здравствуйте\!\n⚠ Для создания заявки отправьте геопозицию, нажав на 'скрепку' ниже\n"
-text_welcome += text_help
+text_short_desc = f'''⚠ *Редактирование заявки:
+\- Комментарий: текст \(до {cfg_max_symbols} симв\.\)  
+\- Геопозиция: отправьте через 'скрепку'
+_Детали уточняйте у автора заявки_*
+'''
+# text_short_desc = f'⚠ *Вы можете добавить описание заявки в текстовом поле ниже \(максимум {cfg_max_symbols} символов\), также уточняйте детали в личных сообщениях*\n'
 
-text_wait_location = "⚠ Для создания заявки отправьте геопозицию, нажав на 'скрепку' ниже\n"
-# text_wait_location += "если включена трансляция, подождите\n"
-text_wait_location += text_help
 
 text_select_status = "Выберите тип заявки\n"
 text_select_car = "Выберите тип авто\n"
@@ -63,19 +68,12 @@ kbd_yes_no = {
 ################################
 # Support functions
 ################################
+md_pattern = r'([\[{}#_*~|`!\.\]=+\-\>()])'
+def text_to_markdown(text):
+    return re.sub(md_pattern,r'\\\1', text)
 
-def text_escape(text):
-    # todo need to correct this function
-    # pattern = r"([_*~|`!\.])" ##was r"(\\[_*\[\]()~|`!\.])"
-    # text = re.sub(r"\\"+pattern, r"\1", text) #размаркирование, на всякий случай, чтобы не получилось двойное
-    # text = re.sub(pattern, r"\\\1", text)
-    return text
-
-def username_as_markdown(text):
-    pattern = r"([_*~|`!\.])"
-    text = re.sub(r"\\"+pattern, r"\1", text)
-    text = re.sub(pattern, r"\\\1", text)
-    return text
+def text_from_markdown(text):
+    return re.sub(r"\\"+md_pattern, r"\1", text)
 
 def user_in_process(user)->bool:
     if not user:
@@ -131,21 +129,26 @@ def ui_select_menu(user,key=None,message=None):
 
 def ui_yes_hndl(user,key=None,message=None):
     if user_in_process(user):
+        comments = message.split('\n')[1:-1]
+        user.comment = ''
+        for item in comments:
+            user.comment += f'{item}\n'
+        if len(user.comment) > 1:
+            user.comment = user.comment[:-1]
+        NextGIS.upd_user(user.name, {"comment":user.comment})
         return ui_main_menu(user)
     else:
         return ui_welcome(user) 
 
 def ui_no_hndl(user,key=None,message=None):
-    # todo add process
     if user_in_process(user):
         text, kbd = ui_main_menu(user)
-        # print(text)
     else:
         text, kbd = ui_welcome(user) 
     return text, kbd
 
 def ui_replace_comment(user,key=None,message=None):
-    text = f"Вы ввели новое описание заявки:_\n{username_as_markdown(message)}\n_ Сохранить?"
+    text = f"Вы ввели новое описание заявки:_\n{text_to_markdown(message[:cfg_max_symbols])}\n_ Сохранить?"
     kbd = tgm.make_inline_keyboard(kbd_yes_no)
     return text, kbd
 
@@ -155,8 +158,8 @@ def ui_main_menu(user,key=None,message=None):
         free_list = NextGIS.get_free_list("Ищу водителя")
     else:
         free_list = NextGIS.get_free_list("Водитель")
-    # if user.comment != None:
-    #     text +=f'_*{username_as_markdown(user.comment)}*_\n'
+    if user.comment != None:
+        text +=f'_*{text_to_markdown(user.comment)}*_\n\n'
     if free_list:
         if user.type == "Водитель":
             text += "Ждут помощи:\n"
@@ -171,18 +174,16 @@ def ui_main_menu(user,key=None,message=None):
             hour = item.hour_loc
             minute = item.minute_loc
             text += f'{item.subtype} {distance}км, был в {hour:02d}:{minute:02d}\n'
-            # if item.comment != None:
-            #     print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!', item.comment, username_as_markdown(item.comment))
-                # text += f'_{username_as_markdown(item.comment)}_\n'
-            text += f'[написать](https://t.me/{username_as_markdown(item.name)}), [на карте]({map_url})\n\n'
+            if item.comment != None:
+                text += f'_{text_to_markdown(item.comment)}_\n'
+            text += f'[написать](https://t.me/{text_to_markdown(item.name)}), [на карте]({map_url})\n\n'
 
         text = text[:-1]
         text += text_separator
     else:
         text += text_req_not_found
 
-    # text += f'Все доступные заявки можно посмотреть на [карте]({GET_MAP_URL(user.location)})\n\n'
-    text += '⚠ *Пожалуйста, подробности о маршруте уточняйте у пользователя из заявки*\n'
+    text += text_short_desc
     text += text_help
     keyboard = tgm.make_inline_keyboard(kbd_main_menu)
     return text, keyboard
@@ -259,9 +260,9 @@ async def cb_user_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         text, keyboard = ui_select_menu(user)
         try:
             if keyboard:
-                await message.reply_text(text_escape(text), parse_mode=text_parse_mode, disable_web_page_preview=True, reply_markup=InlineKeyboardMarkup(keyboard))
+                await message.reply_text(text, parse_mode=text_parse_mode, disable_web_page_preview=True, reply_markup=InlineKeyboardMarkup(keyboard))
             else:
-                await message.reply_text(text_escape(text), parse_mode=text_parse_mode, disable_web_page_preview=True)
+                await message.reply_text(text, parse_mode=text_parse_mode, disable_web_page_preview=True)
         except Exception as e:
             print('[!!] Exception ', e)
     return None
@@ -278,15 +279,15 @@ async def cb_user_register(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     # show menu
     if user_in_process(user):
-        # text, keyboard = ui_replace_comment(user, message=update.message.text)
-        text, keyboard = ui_main_menu(user)
+        text, keyboard = ui_replace_comment(user, message=update.message.text)
+        # text, keyboard = ui_main_menu(user)
     else:
         text, keyboard = ui_welcome(user)
     try:
         if keyboard:
-            await update.message.reply_text(text_escape(text), parse_mode=text_parse_mode, disable_web_page_preview=True, reply_markup=InlineKeyboardMarkup(keyboard))
+            await update.message.reply_text(text, parse_mode=text_parse_mode, disable_web_page_preview=True, reply_markup=InlineKeyboardMarkup(keyboard))
         else:
-            await update.message.reply_text(text_escape(text), parse_mode=text_parse_mode, disable_web_page_preview=True)
+            await update.message.reply_text(text, parse_mode=text_parse_mode, disable_web_page_preview=True)
     except Exception as e:
         print('[!!] Exception ', e)
 
@@ -300,7 +301,7 @@ async def cb_reaction_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not user:
         print("[!!] Ошибка пользователя!", username)
         text = "Ошибка\!"
-        await query.edit_message_text(text=text_escape(text), parse_mode=text_parse_mode)
+        await query.edit_message_text(text=text, parse_mode=text_parse_mode)
         return None
 
     # show menu
@@ -313,9 +314,9 @@ async def cb_reaction_button(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     try:
         if keyboard:
-            await query.edit_message_text(text=text_escape(text), parse_mode=text_parse_mode, disable_web_page_preview=True, reply_markup=InlineKeyboardMarkup(keyboard))
+            await query.edit_message_text(text=text, parse_mode=text_parse_mode, disable_web_page_preview=True, reply_markup=InlineKeyboardMarkup(keyboard))
         else:
-            await query.edit_message_text(text=text_escape(text), parse_mode=text_parse_mode, disable_web_page_preview=True)
+            await query.edit_message_text(text=text, parse_mode=text_parse_mode, disable_web_page_preview=True)
     except Exception as e:
         print('[!!] Exception ', e)
     return None
