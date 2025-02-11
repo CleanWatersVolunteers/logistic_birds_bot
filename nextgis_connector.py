@@ -281,6 +281,6 @@ class NextGIS:
     def complete_user(cls,name):
         cls.upd_user(name, {
             "long":0, "lat":0,"end_route":"завершено",
-            "car":None,"cargo_type":None,"status":None,
+            "car":None,"cargo_type":None,"status":None, "comment":None
         })
 
